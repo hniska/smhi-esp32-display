@@ -1,0 +1,5 @@
+.fontwork/
+.pio/
+
+# innehåller wifi-lösenord — kopiera config.example.h till config.h
+SMHI_Display/config.h

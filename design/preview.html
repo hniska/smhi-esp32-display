@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Skellefteå Meteogram</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#EFF2F4; --surface:#FFFFFF; --ink:#12191E; --muted:#5B6B76;
+    --rule:#D8DFE4; --chip:#E4EAEE; --accent:#C2711B; --accent-soft:#F6E7D2;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0C1216; --surface:#121A20; --ink:#E6EEF2; --muted:#8299A6;
+      --rule:#22303A; --chip:#1B262D; --accent:#F2A03D; --accent-soft:#2A2012;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0C1216; --surface:#121A20; --ink:#E6EEF2; --muted:#8299A6;
+    --rule:#22303A; --chip:#1B262D; --accent:#F2A03D; --accent-soft:#2A2012;
+  }
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:Montserrat,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    padding-inline:16px; padding-block:28px 48px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:900px; margin-inline:auto; display:flex; flex-direction:column; gap:26px;}
+  header h1{
+    font-size:clamp(22px,4vw,30px); font-weight:700; letter-spacing:-0.02em;
+    margin:0 0 6px; text-wrap:balance;
+  }
+  header p{margin:0; color:var(--muted); font-size:14px; line-height:1.55; max-width:62ch;}
+  header p code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px;}
+  .controls{display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end;}
+  .group{display:flex; flex-direction:column; gap:7px;}
+  .group > span{
+    font-size:10px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--muted);
+  }
+  .seg{display:flex; border:1px solid var(--rule); border-radius:3px; overflow:hidden;}
+  .seg button{
+    font:inherit; font-size:13px; font-weight:500; padding:7px 13px;
+    background:var(--surface); color:var(--ink); border:0; cursor:pointer;
+    border-right:1px solid var(--rule);
+  }
+  .seg button:last-child{border-right:0;}
+  .seg button[aria-pressed="true"]{background:var(--accent); color:#fff; font-weight:600;}
+  :root:not([data-theme="light"]) .seg button[aria-pressed="true"]{color:#171008;}
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]) .seg button[aria-pressed="true"]{color:#fff;}
+  }
+  .seg button:focus-visible{outline:2px solid var(--accent); outline-offset:-2px;}
+  .stage{
+    background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+    padding:22px; display:flex; justify-content:center; overflow-x:auto;
+  }
+  .bezel{
+    background:#05080A; padding:10px; border-radius:7px; line-height:0;
+    box-shadow:0 1px 0 rgba(255,255,255,.07) inset, 0 10px 26px rgba(0,0,0,.30);
+    flex:none;
+  }
+  svg.panel{display:block; max-width:100%; height:auto;}
+  .meta{
+    display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12px; color:var(--muted);
+    font-variant-numeric:tabular-nums;
+  }
+  .spec{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:22px;}
+  .spec section{display:flex; flex-direction:column; gap:10px;}
+  .spec h2{
+    font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--muted); margin:0; padding-bottom:8px; border-bottom:1px solid var(--rule);
+  }
+  .sw{display:flex; align-items:center; gap:10px; font-size:12.5px;}
+  .sw i{width:20px; height:20px; border-radius:3px; flex:none; border:1px solid var(--rule);}
+  .sw b{font-weight:600;}
+  .sw code{
+    margin-left:auto; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:11.5px; color:var(--muted);
+  }
+  dl{margin:0; display:grid; grid-template-columns:auto 1fr; gap:7px 14px; font-size:12.5px;}
+  dt{color:var(--muted);}
+  dd{margin:0; font-variant-numeric:tabular-nums;}
+  footer{font-size:12px; color:var(--muted); line-height:1.65; border-top:1px solid var(--rule); padding-top:16px;}
+  footer a{color:var(--accent);}
+  @media (prefers-reduced-motion: reduce){*{transition:none !important;}}
+</style>
+<style>body{margin:0;font-size:14px;}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Skellefteå Meteogram</h1>
+    <p>
+      Pixelexakt förhandsvisning av väderpanelen för Freenove FNK0103 —
+      320 × 240, liggande, LVGL 8.4 på ESP32. Data hämtas från SMHI via
+      <code>smhi-mcp.hakan-3a6.workers.dev</code>. Panelen är medvetet enbart mörk:
+      den sitter på en bakgrundsbelyst TFT, inte i en webbläsare.
+    </p>
+  </header>
+
+  <div class="controls">
+    <div class="group">
+      <span>Skala</span>
+      <div class="seg" id="scale" role="group" aria-label="Skala">
+        <button type="button" id="s1" data-scale="1" aria-pressed="false">1×</button>
+        <button type="button" id="s2" data-scale="2" aria-pressed="true">2×</button>
+        <button type="button" id="s3" data-scale="3" aria-pressed="false">3×</button>
+      </div>
+    </div>
+    <div class="group">
+      <span>Sida (tryck på panelen)</span>
+      <div class="seg" id="pages" role="group" aria-label="Sida">
+        <button type="button" data-page="0" aria-pressed="true">Meteogram</button>
+        <button type="button" data-page="1" aria-pressed="false">Timmar 1</button>
+        <button type="button" data-page="2" aria-pressed="false">Timmar 2</button>
+      </div>
+    </div>
+    <div class="group">
+      <span>Datamängd</span>
+      <div class="seg" id="dataset" role="group" aria-label="Datamängd">
+        <button type="button" id="d-dry" data-set="dry" aria-pressed="true">Skellefteå · torrt</button>
+        <button type="button" id="d-wet" data-set="wet" aria-pressed="false">Östersund · regn</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="bezel"><svg class="panel" id="panel" width="640" height="480"
+      viewBox="0 0 320 240" role="img" aria-label="Väderpanel 320 gånger 240 pixlar"></svg></div>
+  </div>
+
+  <p class="meta" id="meta"></p>
+
+  <div class="spec">
+    <section>
+      <h2>Palett</h2>
+      <div id="swatches"></div>
+    </section>
+    <section>
+      <h2>Geometri</h2>
+      <dl id="geom"></dl>
+    </section>
+    <section>
+      <h2>Typografi</h2>
+      <dl>
+        <dt>Hjältesiffra</dt><dd>Montserrat 600 · 32 px</dd>
+        <dt>Brödtext</dt><dd>Montserrat 500 · 14 px</dd>
+        <dt>Etiketter</dt><dd>Montserrat 700 · 10 px</dd>
+        <dt>Axel</dt><dd>Montserrat 500 · 10 px</dd>
+        <dt>Timtabell, temp</dt><dd>Montserrat 700 · 16 px</dd>
+        <dt>LVGL-fonter</dt><dd>sv_10 / sv_12 / sv_14 / sv_16 / sv_32</dd>
+      </dl>
+    </section>
+  </div>
+
+  <footer>
+    Nattbanden bakom kurvan är beräknade soluppgångar och solnedgångar för platsens
+    latitud. På 64,75° N växlar dagsljuset mellan 3 h 45 min och 21 h 45 min över året,
+    så förhållandet mörkt/ljust bakom kurvan bär verklig information här.
+    Källa: SMHI öppna data (snow1g v1) via MCP-workern.
+  </footer>
+</div>
+
+<script>
+const DATA = {"dry":{"place":"Skellefteå","lat":64.75,"lon":20.95,"rows":[{"t":"2026-09-21T17:00:00Z","T":9.1,"p":0,"ws":2,"wd":292,"rh":74,"cc":0,"s":1},{"t":"2026-09-21T18:00:00Z","T":8.2,"p":0,"ws":2.5,"wd":292,"rh":75,"cc":0,"s":1},{"t":"2026-09-21T19:00:00Z","T":7.3,"p":0,"ws":2.8,"wd":290,"rh":78,"cc":0,"s":1},{"t":"2026-09-21T20:00:00Z","T":6.7,"p":0,"ws":2.7,"wd":290,"rh":80,"cc":0,"s":1},{"t":"2026-09-21T21:00:00Z","T":6.5,"p":0,"ws":2.9,"wd":300,"rh":81,"cc":0,"s":1},{"t":"2026-09-21T22:00:00Z","T":6.1,"p":0,"ws":2.7,"wd":306,"rh":81,"cc":0,"s":1},{"t":"2026-09-21T23:00:00Z","T":5.5,"p":0,"ws":2.6,"wd":292,"rh":84,"cc":0,"s":1},{"t":"2026-09-22T00:00:00Z","T":4.8,"p":0,"ws":2.5,"wd":285,"rh":87,"cc":0,"s":1},{"t":"2026-09-22T01:00:00Z","T":4.3,"p":0,"ws":2.6,"wd":287,"rh":89,"cc":0,"s":1},{"t":"2026-09-22T02:00:00Z","T":4,"p":0,"ws":2.5,"wd":290,"rh":89,"cc":0,"s":1},{"t":"2026-09-22T03:00:00Z","T":3.6,"p":0,"ws":2.4,"wd":289,"rh":90,"cc":0,"s":1},{"t":"2026-09-22T04:00:00Z","T":3.1,"p":0,"ws":2.3,"wd":290,"rh":92,"cc":0,"s":1},{"t":"2026-09-22T05:00:00Z","T":2.9,"p":0,"ws":2.1,"wd":290,"rh":93,"cc":0,"s":1},{"t":"2026-09-22T06:00:00Z","T":4.3,"p":0,"ws":2.2,"wd":291,"rh":90,"cc":0,"s":1},{"t":"2026-09-22T07:00:00Z","T":6.7,"p":0,"ws":2.1,"wd":301,"rh":81,"cc":0,"s":1},{"t":"2026-09-22T08:00:00Z","T":8.9,"p":0,"ws":1.6,"wd":330,"rh":72,"cc":0,"s":1},{"t":"2026-09-22T09:00:00Z","T":10.3,"p":0,"ws":1,"wd":340,"rh":69,"cc":0,"s":1},{"t":"2026-09-22T10:00:00Z","T":11.4,"p":0,"ws":0.6,"wd":354,"rh":65,"cc":0,"s":1},{"t":"2026-09-22T11:00:00Z","T":12.3,"p":0,"ws":0.4,"wd":62,"rh":62,"cc":0,"s":1},{"t":"2026-09-22T12:00:00Z","T":12.9,"p":0,"ws":0.8,"wd":135,"rh":59,"cc":0,"s":1},{"t":"2026-09-22T13:00:00Z","T":13.2,"p":0,"ws":2.4,"wd":133,"rh":61,"cc":0,"s":1},{"t":"2026-09-22T14:00:00Z","T":12.5,"p":0,"ws":2.9,"wd":131,"rh":65,"cc":0,"s":1},{"t":"2026-09-22T15:00:00Z","T":11.6,"p":0,"ws":2.6,"wd":135,"rh":67,"cc":0,"s":1},{"t":"2026-09-22T16:00:00Z","T":9.6,"p":0,"ws":2.4,"wd":135,"rh":75,"cc":6,"s":3},{"t":"2026-09-22T17:00:00Z","T":7.9,"p":0,"ws":2.1,"wd":141,"rh":86,"cc":7,"s":3},{"t":"2026-09-22T18:00:00Z","T":6.8,"p":0,"ws":2,"wd":157,"rh":90,"cc":7,"s":3},{"t":"2026-09-22T19:00:00Z","T":6.4,"p":0,"ws":2.2,"wd":163,"rh":94,"cc":8,"s":3},{"t":"2026-09-22T20:00:00Z","T":6.5,"p":0,"ws":1.9,"wd":175,"rh":94,"cc":8,"s":6},{"t":"2026-09-22T21:00:00Z","T":6.8,"p":0,"ws":1.7,"wd":179,"rh":92,"cc":8,"s":6},{"t":"2026-09-22T22:00:00Z","T":7.1,"p":0,"ws":1.8,"wd":185,"rh":90,"cc":8,"s":6},{"t":"2026-09-22T23:00:00Z","T":7.4,"p":0,"ws":1.9,"wd":188,"rh":87,"cc":8,"s":6},{"t":"2026-09-23T00:00:00Z","T":7.4,"p":0,"ws":1.8,"wd":201,"rh":85,"cc":8,"s":6}],"bytes":3200,"fetched":1790010000000},"wet":{"place":"Östersund","lat":63.18,"lon":14.64,"rows":[{"t":"2026-09-21T17:00:00Z","T":9.2,"p":0,"ws":5.2,"wd":311,"rh":78,"cc":0,"s":1},{"t":"2026-09-21T18:00:00Z","T":8.2,"p":0,"ws":4,"wd":303,"rh":84,"cc":0,"s":1},{"t":"2026-09-21T19:00:00Z","T":7.6,"p":0,"ws":3.9,"wd":301,"rh":88,"cc":0,"s":1},{"t":"2026-09-21T20:00:00Z","T":7.2,"p":0,"ws":4.4,"wd":301,"rh":88,"cc":1,"s":1},{"t":"2026-09-21T21:00:00Z","T":6.9,"p":0,"ws":4.2,"wd":301,"rh":84,"cc":5,"s":3},{"t":"2026-09-21T22:00:00Z","T":6.6,"p":0,"ws":4.8,"wd":300,"rh":84,"cc":8,"s":6},{"t":"2026-09-21T23:00:00Z","T":6.2,"p":0,"ws":4.2,"wd":304,"rh":85,"cc":5,"s":3},{"t":"2026-09-22T00:00:00Z","T":5.4,"p":0,"ws":2.8,"wd":307,"rh":87,"cc":1,"s":1},{"t":"2026-09-22T01:00:00Z","T":4.5,"p":0,"ws":2.2,"wd":295,"rh":90,"cc":3,"s":2},{"t":"2026-09-22T02:00:00Z","T":4.4,"p":0,"ws":2.5,"wd":303,"rh":90,"cc":2,"s":2},{"t":"2026-09-22T03:00:00Z","T":3.9,"p":0,"ws":2.1,"wd":310,"rh":92,"cc":2,"s":2},{"t":"2026-09-22T04:00:00Z","T":3.3,"p":0,"ws":1.4,"wd":306,"rh":93,"cc":3,"s":2},{"t":"2026-09-22T05:00:00Z","T":3,"p":0,"ws":1.1,"wd":319,"rh":94,"cc":2,"s":2},{"t":"2026-09-22T06:00:00Z","T":3.5,"p":0,"ws":0.7,"wd":312,"rh":93,"cc":0,"s":1},{"t":"2026-09-22T07:00:00Z","T":5,"p":0,"ws":1.3,"wd":298,"rh":86,"cc":0,"s":1},{"t":"2026-09-22T08:00:00Z","T":6.6,"p":0,"ws":0.7,"wd":254,"rh":80,"cc":2,"s":2},{"t":"2026-09-22T09:00:00Z","T":8.3,"p":0,"ws":1.3,"wd":174,"rh":77,"cc":8,"s":4},{"t":"2026-09-22T10:00:00Z","T":9.3,"p":0,"ws":2.4,"wd":176,"rh":74,"cc":8,"s":6},{"t":"2026-09-22T11:00:00Z","T":9.7,"p":0,"ws":3.3,"wd":176,"rh":69,"cc":8,"s":6},{"t":"2026-09-22T12:00:00Z","T":9.7,"p":0,"ws":3.5,"wd":177,"rh":68,"cc":8,"s":6},{"t":"2026-09-22T13:00:00Z","T":9.6,"p":0,"ws":3.5,"wd":181,"rh":69,"cc":8,"s":6},{"t":"2026-09-22T14:00:00Z","T":9.6,"p":0,"ws":3.2,"wd":187,"rh":68,"cc":8,"s":6},{"t":"2026-09-22T15:00:00Z","T":9.3,"p":0,"ws":2.7,"wd":178,"rh":76,"cc":8,"s":6},{"t":"2026-09-22T16:00:00Z","T":8.6,"p":0,"ws":2.2,"wd":174,"rh":82,"cc":8,"s":6},{"t":"2026-09-22T17:00:00Z","T":8.1,"p":0,"ws":2.1,"wd":166,"rh":83,"cc":8,"s":6},{"t":"2026-09-22T18:00:00Z","T":7.7,"p":0,"ws":1.8,"wd":158,"rh":84,"cc":8,"s":6},{"t":"2026-09-22T19:00:00Z","T":7.8,"p":0.1,"ws":2.1,"wd":160,"rh":86,"cc":8,"s":6},{"t":"2026-09-22T20:00:00Z","T":7.8,"p":0.2,"ws":1.7,"wd":146,"rh":87,"cc":8,"s":18},{"t":"2026-09-22T21:00:00Z","T":7.6,"p":0.1,"ws":1.6,"wd":125,"rh":88,"cc":8,"s":6},{"t":"2026-09-22T22:00:00Z","T":7.7,"p":0.1,"ws":2.3,"wd":123,"rh":88,"cc":8,"s":6},{"t":"2026-09-22T23:00:00Z","T":7.9,"p":0.1,"ws":3.1,"wd":136,"rh":89,"cc":8,"s":6},{"t":"2026-09-23T00:00:00Z","T":7.7,"p":0,"ws":3.6,"wd":140,"rh":89,"cc":8,"s":6}],"bytes":3207,"fetched":1790010000000}};
+const GEOM = {"W": 320, "H": 240, "HEADER_H": 26, "RAIL_X": 8, "RAIL_W": 88, "PLOT_X": 102, "PLOT_Y": 34, "PLOT_W": 212, "PLOT_H": 172, "PRECIP_BAND": 48};
+const HOURS = {"COLS_Y": 31, "ROW_Y0": 46, "ROW_H": 24, "ROWS": 8, "PAGES": 2, "TIME_X": 8, "ICON_X": 56, "TEMP_R": 124, "FEELS_R": 184, "MM_R": 228, "ARROW_CX": 254, "WIND_X": 266, "EVENT_X": 84};
+const ICONS = ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAACz0lEQVR4nM1US2gTURS9dyYzY9JMkja2CC6KGxd240KwlHxsi4huRDDZCEUtVcRVxU3dxGwUxC4EN1Ztp1U3KeJvKajRLupaEJFSUFy0FdtkJp9OJvOuvNdGm5oEl72reW9mzj3nvHMfwH8UESABIOyIIgCkTEKuYzcVD30f7/XWfUeNGUvbNxCAMDnrUgY2QB8d9ZVkthAKq6MC6G3cQymQEHnvFoA1j3JPIu2mEY1hElzxQq8oPr8aZgCdlIp7+BamgeXu93a0ZphJiGe5LB3U29WsaUQv8iZ4KpsrmfYhWXJuYjpbxf5s1TQi1xSv9sV8GOkUlmyRX+eDkJIGZhqRCwTSUvDs+5eFmdiQLNEgY7BbUaR35kr5nhpU7wDgV9235xYkDhBimjUFhJ4Ecg/52jKiE/6gOgIOA2AEsEuGouV8bNMq/ZicL3M/gdeRrFvztGm28kZsKBBUps2cXeFOiIYE1WCHpllrlanAuQ/nG/2HXD9Hpwd9uuWRn+ltnpBlOkOEkAroymmz6DAEFEyIgDQFya7SErp0ECQc1v0ef950JkPDc4uUSkkblBsUAbRxBOCGb9HBmFgproJ+yYUrIGEnue4bAFiEns/YVLJpRMf0kHYjv7puI6IqYIgqAV3VzELldaBbPvHrh9cX1soMoKtc872OIacsuiRnXd0u3S7m4WSwQzu8bjmCrNfn0WzbXQMmXebx4X2h5aRc32Q3Ex2zNO/E8nrpmF2oTgLBNwJach16lS86A5LMunlOBYnM3zGt92wzoDysxcfxFR7ePyc+PRguz0T31dY5I3KJXgySZcT6t4M29JCPVWhkflXk7GcXWaXlqzLSqE+y98PC8QKm04yPJ1PoU+jM3JqYKHGOLYqHvBZc04iO09MBoud9+gajzYujQf1z29Tk8xHkE8DXigR3C1Z1ACp7S0JWElwucwddulx+s9PcVr8BIA5MQoIF62sAAAAASUVORK5CYII=", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAACDUlEQVR4nNWUT2sTQRjG552dzKYbgq3/2khTKGILtghKpd486NmD+An8AH4IDx499iR60FPw4gco60lQQw9Csc2hIUlpIqWapLPbJJudR2ablTS2S2kv+sDAMM/M733feZlh7P8WQIVCwQIgAPBzsnA+wEmwrXprufZr/3mpunN/1DtOYnTBHCAivV7evj3mZFakFPc6B77uc/EuCXQsMIZt1Bq3bJle5ZxPMDB0u8GrhdlrJQAWEYUsQXx0oVgspqDxRtpywvc8X0hBxKk8KJWSYEeAg+g6M5W/6zjOnXarFTJOEiGMecN47BTiQ/MoOmk8kLYNE4MBlucpSCkfrZV2rhBRv1hECgDFgyUAI2kNm+hwHxFREAR6zHEuZzOpFdd1xdISBUSEeLCEpkQmSH/tBwH9yZjIajWbOpvNPsnPLea/VxovSISfnExGK0V0c/rCnsk0hg9nqKMy0mLVU6pup9McQNRRzjlXSumUbS87jvOBtNgIu9iytH99+LqOAAcR+OLkpNKkn6Vtm4QQlta6b8DG9z2v5/teMJW7eqnTOXg7P5P7EjfzxC7FL2G9vP20uttuNvZ7qP1UqO0p1NsdVHZb2Kz+eBnvxUhj/nopJpr5EBZmp19/26x8HL84/rgT9B4SoxT12FrYD97Pz+Q+D+5Ns9PKQM/isSSZklxADL4w7rqH8zPB/hn9BrSTIXXAZ3utAAAAAElFTkSuQmCC", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAADmUlEQVR4nJ1UW2hcRRj+/5mzZ3fP3nJ3IwpS44tRKLJgJCcuRRGCSAXZ0AepDUVEkGrVgujDYV+8EBVC9aU1NBFU3PhiHipIMI1JISgpVNxGLEXBeqtpds/Zs7dzmV/mrNFdkjbgD3NmOPPPN//3zTcD8E8QAFIhx2GPIALcK6cjtkGpMBKtfjh21px98PD2fzKAwR7BZGVyUP5I77bm9CxOzPutqbiqpbVxANLJMAIgzIMonx7puSkgFHJBMnfZ/kRSPWeeGX2JjKwCuUXL/rX2HBN4EvN5UYQiN+f0F1VN3bBm9H5JfTf6GNAhgyHmhTmrHweC+1OTq4f+mNH39cWY7jiQdgSdSxH7rhaiXzxfvJGMDk5D7m6Sa2BXQKnNcA636W7N6E8mNf4eD/OUPC3PEVCve1O+yV/vPr5cpqWsEiw+sOztCtge5dPZoXCELjKGWt0RLqLUBVg8GeKW5R1MHfl64WYaKvJjzY5NJ26Jjlb+rL3J0O+OxMKaaTZdhhiS84LIA58EAE1unspe6O1hz1Zst5og/i5OLjekloiSS7B5ZxCwRMuWbdW3RgKJmILiVkB8FYC9DACRvSnPZTNxFb+tNz1fkPQxSNaU7I8q5U3vxJXmoem79q0mnarp9D2+YMu5HZS3DSt95pXrP9oJdSrVpZ4AlwIOniugstl4p/vIytsASzL1erCOiAEi7WobmL+EVv335xWFv6LF3DtrFn+Ec3wCATXHE58knlr59Mu1iy8gZ48pSuhqw7Knx7OZC4UC8YkJlPYJgFvmRIDKjN6nRNj3rifeutyon8w8s+6WzmTv8CGU7ptcXPti9ZsP+tO3HbUrFQhHIlCt2iUAOPhwZnhF1lUoCAnsd2gor1XX02tbwSbzwKzagcOaf+2vhaGl9d7U1m+NRtMjISRHUhRFCYVC5DruqfNnN47l8xOOYRhsx6FIPaWWhkEsn0fx/mW6fdj+4WPfFw84jsNQGqSlH8mxpsVAkCjWG9XXxkfu+7wDsN1PUvBicV65Whn6qqd3YPT65jUfke143ojISySTim3bZVeIezp82AYmNxc/lwZjRHx/ubTlAMqHieTVbGvky8SKaTbDarhL4dgJ+B8wkjy9R3W9jEifDaQH1Wg0qsTiCR6Lx9tagkc1jQ+kB8NNp7FRqZXO3/D1lVXKfnF9PcmYdgyIxlzHJQw88a9EpKphWcBPQrhTD2XuvXIjvP8Vsoi/ARF6tpDwWNlmAAAAAElFTkSuQmCC", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAC/ElEQVR4nKWUzWsTQRjG553dzG42m5TUmjSCSgsexFZoKW3FFg+9KIJeJH+A0Gv/AQ+lXjyI1ypFEMSLwYOCFIQWlBKokgQrxrYRG/thrf1Mm6/NbnZemZjU1jRS7QMDuzs7v3nmmXeGkAOEiBBClCKRiAMRKTmK8KiAWrC59e2ub1vp24mF1Ut/9v1N8l4YAPB4cqnNqbmGmSR35/M5XqTkyWFA+4AV2MziynmFqeOUUi9BgoWC9fBc04kEIkoAYJNDiFYeShvA8RFTmDeXzeZkJgNQSJaXCoeBCdHy7FxvCHRqmta+s71tEwoMbRTWz4g+8g+i0Wi05JITqY8pCooECKKUzWaQMXYtllg+DgDFSARFCUGl1QSSXQED+PUfAIBlWdypaQ1ul2NY1GRHB1gAgJVWCwiVwGfmV67rbv15Op22AUASnYjIXS6dFgrGW6to3ecghV0OVkznCvnWZv8apcARqx1ysYSiCuPZTOa7oqoi19KOAgDN53O27nZ3AYGeujoVdK9TaW32b4hsn3IsTbwPWLZPW/z+DAc+oCoKyLIsIaJFCDFVVYXtVKr/7OlA/8d4si82NXvv9fvEg9Hwu7YggB0KlaDVmVZOQjy5dHNhbSe1nMrjpoH46evyovg+Go6NxOZ+4JupBE7OLOBYJL45Fon3lpMjZfB+cigUkoLBoP1hdr7ZU++9QSl0mgXjTiw6teI/eWrJyBsWR5uKgpJlWXY4HGiZ1kh4dHpgaChoDg4O0iqrFeju+6vJJp/P+9i2ixdM0xQRlcagCB4ANM1FOPJ43sjeutLd/uLAehLLj8eJzNhnmNvIjdcfa7i4sb5qA9CqTUDEotvjkTOZTMrivKUWUEyOLycmvJLkWZQkcNicUyCioPcOwVJqyHlRdWqKYRmXD7ySBEyEfLWnJwWAz3yNAeZ0OmWX7pZcur6nuSWnpkm+xoBSMI3pdG4rXPMIVY7XWDTqoVQbIIi9lmkhwG+LiAQZU4SBJOfW3b6O1i+1eP8lYeInTSWS2BERBAQAAAAASUVORK5CYII=", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAADpklEQVR4nI1UW2gcZRQ+55/Zf3c2e43ZbloQiqCSIqUQY/Ow2XYpUVu8UGH3KVCx1kjpUyFSFFlTBBXR9zTYNIU+uKs+FEkTpNlkaaxCUvShLRSr0NhQQpPMzu7sZS7/kZmktgmbNB8M81/O/537AVgDZbOMcmnp/32uW1GHu1uJAB+fpSWCx/ttgXJ7uPPXRnvO6Bd7HtDF3pZHZNt5z4iyzFnoF5JvrYwkTmDmluFYJQh2+gM8DkHDQ1lgmMnb2mjigHopEXUVbGIpg/wt98IWtDMSU85pIz0fIgJVkJ81DfMVPDqt4iAIbSTxUTDEp6Qa2+e+zKVdQzbCJZsd6vS83D9nahcSHxCw+eUVvL4rDgMCoYMzVBeXGt8GWuSTAvBu+FjxG6K0hJi3NyV8EjT0hl9XSlMtYd5lVSyQFQkaNVur1lmy9XjhT3gKkAoHZO0edYUCkqJq4oYE4tNg1HtaW27UQgFZUXXbjChY0/TG7Hzw2cNxq9HWptQlMMMLTlxhA1j5TiUCRNcg5L3KSOwBpBfBtC3OmVI36fPIYnH3/Ub0uVJHX/9LmbzRNn8ZqjXzi1L1waFm2ZeDLwRU7R4lQGsotum9KfPGEvg9slGuHw+/N33+yuxfA5zZfYJox+SN2/9cNuSv3u5+vk8dfrWViBAQxTqXN5qsnk92MQZnQ+8WD4/NzA7H23e9X1JVsC0LuM8HEmNQM8z+3s6Oc458oVCQU6mUtY6Qhjo9uJrljwXyaOTY5MBEcXJ/yzO7f6uUNJOAJHTiDSAYY6D4/ZJhGNfK5cU3j6ZSqkNDJBARSXZigJm8WRlNHrGJTvgaC6/9ODGxg/liZ2zTEoDEENCtOQSQhBCgV8p2KBxNIMZ/ujp3c2TpLn2PiIYTAkcrIgAtfJeOBT3/4i97xyMR+/40k6T2qq4TY6xpRxCR7fMpkk9RoFIuzZjCd+T3K5cqTwg7S4TxX+eKoUi0p6SumIjo2armiEgAkRWLt/OHDxc/e71736DripstIBgr/hwDYJ1lTRMAKG9F5pqAyJAxqVrVnXrsdetw7YIcUsVWyoA0z73cUWA6LQ5AjnCTb/WcSFiceyUguu3W4SNt+TywTCZVH7/+xyey7PkhEJS5EOQGeAuXwSHT9cqy8MhfuknZIOCmfmxm7pDXp5wSth2yLBubDyoiL/cCMPxbLWtfv5PcfyebXR2F69D0cBtYzcMmQzKXy0mQTrtxeBpisRhOHTwoBtda8D+gKcB8w+Vc4AAAAABJRU5ErkJggg==", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAC/0lEQVR4nK2Uz0tUURTHz7nv54zj6GBTYkHgJrIWiYtclDiUEBVBke8PiBYt/AeqhbYL2rUIqkUQRKitTYIa6QdWMGlg+QOzQhgptHGe88Zx3r33xH3j2Jhis+jA4z3OfXzuOd/zvRfgryAiRkQI/yOIiJW/vy66ByfnFxKVuWqCVcIQUX6cmW+fXVh6Frbtz0jYU1oirVqgvg7TEFFMfEtfjEYijxnT9JzrrkmfX0VEBaSqgVTSS86k03ES+h3Ouc55QXAuVmTESJcbqLrlVCqlqyqkr12qj9XHC4WCj4iaoWuWKURo/T+sdlBsbm5OBiWg7PKLPiEi45zzSG20VhTx2sC6fuut48DAgFbVUBDRUFIhAjHGFBQI4aeDKEYA2Pdliimo4zhiJ6je3NysoEIKGjNMo0PmQNSEbJbLuldampvuDr8d76UPk84s0Z7k2NR03vNunznW1l+WABE36Ytlu0x/TR/ULHOsNhq1lpYWx1v2N7UOj47db9i1+7LrZkFwDpZtAyKDol+4crLt8D2lVDKZ1BOJBN8AVtrm0/eFvr2NDT2ZX153aurzwt7GfZPZTMYnIA3V5gCSMQahUFjzi/4rN/fj3PlEYllhiCSqav9MjgAnPk0Yvl8TfjnxWh460PrQsMyzq3lP7buhWcmSJKJ1Ma1QWE0C0IOlL9TvOIeLSoYNYLn1obcfWmwz/JwxbMx7nhrQtnYhImHbIc0OhSC3kn3jS/v0u6ePcpuAIyPA1uzxF9G62PHsckb50djJIkQkgYjH9zSai4s/+061H7kR2CYoFVFmwu/rgFjbiutKAAyO5U6hPIuMafm8JwCgS+VYpWlj+bwHSPOmZSIA+cpOSq/S+++nlCeS3DQtDYgmAx+WdxscBOY4icLw6Ph1XTeeRGp1U8rA6Du1DArmeblf0tBvbhpKRes09CZ1wrJDPVKIKOcCS+bairNMC4Dh3PKKe+tCx9GZ3t7erXfntskqYuPkbLcYnNXu7kCHf0U8HseRzk55AzG4ZH4D5HOgsTKUwmkAAAAASUVORK5CYII=", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAACP0lEQVR4nM2UPWzTUBDH7957dtI6DSRUFQMDEgsSXRCqEF1QmQgSo7PDkomNgc3pxtqRjYHJ2RhCpA6lDIWiUCFwpcDMgmgTUByU2H7v0LkJqkqVD1g46Unne0+/+9+HDPC/G467JCKs1WqCfdd1DSLSX2fyfZLTxGZSuLUV5GLHXGPf6ol3a2vLIUwwcTJARIJLbex+eEB52bIs+yUf9tMYET5pNi3P88REhUQkEVHXd/a8paXz1U77EJIkMXynlBJni+fg4NvX9dKNq1WO+USyjKhPBXJ/XBfM81e7Fx1n4ZPWBo1OBCKmSojICCmMQClR4NMk+vHw9upqm+88IrGOmCYePcZyGTVPMTs3X8lms5bRMY5gaWZEQYZUksSUz5+5h8J5sf2+dWtjo55hmOdR+hYZxqDGTlC0bHgGgKU4jjnbqT0aCkjsTEYpZYHRyX7YDe/fvbnylvsvqgAYBIFNENWdXL4URYOxsKFaFQ8G5mevq6VSV+ZzTqPe/HiJc6W1f+nFbqG4eL3TPogQxVjYMapAFLIXdiPHyRVEnDziSoc9hGUA0PxoKthxrpAyGvQNorjM30eNRAgAQAJROqlZjIzWdiYriEwrBfLILzhW7Xvn8E2huGgTkeYVmfJoJ7dg93phx1jqcTrgk1MWUpUQcQppXC6C0WY/7HZ/T1kxbAjlJb2zuddascDk+oP+BKKCOcvWn5vbryuVSsx7iMPlPkpIlKqdtYds3LaR/wfA930J4AJAbSrYP/8nJ9kvp15E9t5nWOgAAAAASUVORK5CYII=", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAADH0lEQVR4nMVUXUgUURS+5967s+7s7OqukUYQGL30YhmZYUlJVFhJULkvgfRDEFFUVvRHTUtQQk+pBf1rj+uLRIW9tFuYJCQoJGEP0UtFmT+ru5uzO/eeuEMuZW5FPXRgYDhz5rvfd853DyH/K0wTaSQSYYgI/wSEiDAdpC4SYbnq+e8AAQAdhs1tSzWf15eIx19eDIWGFNtQKCR+qs8FZCJSEotR8ur9PJR2K6WsSiFTCp8syzp54eCu24pppK5OTh2qguaQycIAMlxdbSdTie2M80JbZKT6lslkZrvd7ltnmu8cag+FhAL7vrczMFQfACPRqJHvCSzTdSNeVbqgd//5ppJgMHCNUbo2bVmW1+93pybGbzBbnAgf2TOS7dB0mYpZZ0/fAY1rxyllc6UURKIcACH2ralY9PRsc1uX26OvSCYn0owxDQCGAfGeheRY4/76kSxgNIp89WoiOnv69s0qnN0yNjpKbDsjlRTda4AUglipyeqaqrKYeeXuUc2dd0mo3OQX4i8IkvjY6EPXyNtaBxARKQBI0zR5Zc2WD5y7Aum0pSbs2AMRBWMMGHdJ2860rK8oPXyosWVbvr+gXgq7ViLaFIBLKVc4HlON7ejq8vn1YAMhYFqTkyr5w8DQKaRg+AySSqXaAj6jtXxhSex00509Ls6vSiRc2NZ6ME2TVqzZXKh5tAe61yiPj40qG8w4fQeVEOk1DJbn0cnnoY+tGyqX7Dx1+eZNALqJD2fmK8nw6Hl/eyBYuHX481AaALRc3sziEmIDopxVVKyNjQzvjdx//KQo6J9z/uCOKHR2dweReF5zzgO2bSv5f3pXhe71kmQi8aymsmzVVJJKSm3lV0odlVnH/y6c8YPzU1K9XnvxwuUAbli+fJxS0urPL6CKGyLKP3gE50ztAZBIrquhBt68cW4SV9dmXcXiU509/UGPR99NCMm5SaY1MjEeH2/YuLKs45vtnEUx5UPHOrHewYVco8WJZIIIMXMvGUN0cQ+k0l8GayvL3imXhMNhh92PB/7F4lTMpuey+1AxVAXtv1hp38fAuXNK1k/MvgKW3JavjH9DnwAAAABJRU5ErkJggg==", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAC3UlEQVR4nK1US2gTQRief3b2FZvEbUkPFRR7EfHWgFSkRyFUxZM9COJVKlgRQfGSBoQeCioIBQVtQfSwt17aikKDaFFpKL14axHBqtHmUW2yr5lfZks0SWPMwQ9mYf7d75vvf8wS8hfYtq00xxAR5CJtwFoFJQkA+Pyr1UOqwVLIRVTR6XMAeCvfp9NpmslkRCsutBCjAIALSyt3NMMcNQxdlZ95nkuCIFhwqoVzp4aGiraNysgI8GY+rd8sLi6Gjudfr4z2JHrHXKfKyqVSUC4Xg2plm8di8ZRuWo/suZcJKXZ/eVltLgE0pYmh4NLKmmGaB1zHkdvftRSIQSQSYULghudVhlODA6vNXFYfsG1b6z54+Aoi2ec6rnTfcDoFYNKpae7pU6g69yL3/mm1WLoLAJ9qGlCrWzabpa5pzXb3JIYL37+J5nLUQwiBqqpCNBYnP7bKH7c979iZ4wOfw0NtRAUAxLYaPxmNxYc383m/nVhIohSCIMBicdOJxvfu1xXlmnT3IJdjtJjLhWSFwiAFygnd3flWkPkBAdVzqxyAHJUxa31dUCuZDOeJC3wjUCgEiSCIchz+uZCgr+mmgkjeSY1ifz9trKFuzfYkeocrlZ8EpNE2XhGR6Lqxq4a1m4LZbJb0JZNngcIlSmkq4JyhEK0lAZAxRhzHWylvlW6PnBjaqB+d/wqQj/T0tBGU8BowxUQUsutIRMur2gDpSdM04bn+w1uXL6yPj4/DTsolYiDB6wrQLp8HQvavIyDuzKsgCwCwlk6na0yEycnHkbzwKNMjEY25HSruwFG9quFb/Egvqda6HBb0xsSURU3jA1PVGOeBnDXSCRCRMFUlvlNJ7WLcvDd9kaFi+sL/81doAzmQQDCmME2lxJ3ZaUp62ggsfpUqqsYxKIRfdeKMIhpGBITDZzJj57dkLBScmHpiVbhfiHTFwjoDtL3KDakapkEKX7+czpvBsyQh5Bdb8nT7EbXX3wAAAABJRU5ErkJggg==", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAD9klEQVR4nH1Va2gcVRQ+585rZzfZzaNtXqLiC2xLaklC0qZJE6mtrSZqoLVFU8Q/Ffwj5Iciwib4s4hgfXR9QdL+0MTW/tCQIHQbaSmlxsRHotQXTVXobrLpbjKTmd2598jddeM2Dw+cuXe+e+7HOd85wwCsY0SAck18tGv3zbcbKvP4Qn/L0zSyl+b7W7fnYyZ7agMzbzSZcs/WI4Shg4yiYVVh8Hpxmf9ior/5TnnbC7JRcLyXbMe6gQgk8fvry74JlWkvy2vqWlyDRAoicrm/Nbj3SRLeWUaikgBmTJt2OqrwqkuD+/+K1J1hArsBSFcx80E4DAxXl0qIiBQmYs8nIXRXCc5LfPbUM0GTZr7w+9UWwNy1jMt/shzxrH3d/rmmb9ymSJ1WQEhIBCDJvrry3WuKqh0hogqFsV8cK3ViX0vjp9bA7gFNxcPpDBcep3RJSPcnk5nx0HXWhH1jnmRZJoxGo2o8Hqeimvve2bip4lgqlQTueWD4fMAYA9dxXtjTsDVi9zfvIlUb8ZtKIJV0Pb+hKIuOqFcRHiwKqJuzTYlEIlp7e7tXVHN3bTBUcmwuHs+kXVcIzsm2LC5d142T569+f6lrx8Wr/psTrcD5gKoyrhoKosIYgTgMCr6Kec0GRkc3VZXVnNQ1/YmlJUsWrxToKp88GCpV3KXFrx2t/MSBbdWfpT7e2cIU9b2AqTf/PT+fqa4wlGzJw5fHa31GYIQxrLItixhb3SxpQghhmibzBwKwkJy/HGmobXvrVLdWdfS0lY9hUjsG7E3TNKuWbDuzHlk2mDHmOI5IzM6mS8s37Hju6rWeyviZEvuTh6O3BpvK5KAzKC4uIYKGhVRSAOCac1loiMiQMcWyLM64+xhA+RIJuhdt9Zz8GFg8nbYQ4IZuGAhAGQDgUq/cutJzOJHwNE3qlfkVe/5MzNrFTSDwFTw0xLPljV6ZeCoQCJ0lEiCEzFtyZ9tRmFr2VcbougG2vTjnkmjcX7f1d0QmT7JhajgcZvsat38+fGl8j8/nf5ELLwie53EALTcAchAINaS0B6BqmgHc438kE3PHux5p/U2eSYfeMGJfn8iyStLbhDo+GVgl3hpYlmiFLQPhaFTd0tZG/V/+ELQ8ZRpITN+xwDs7u7c5Hw5NhdI6TknsAcXtONJRl74AIPoQcxkV2HJm0/E2OoTIF9Nsi7GhqlIQxk4ffciSmKvC5jz2fme9/S4ArUUGhYSxjblsBdDjgECg4kD+bCUW6/2vsnUJL7QBP/gj6QzwgJuICXRoQkry6PA1I4+p5PtWxo71Zsfo/wllN2F6iIMCXSLjdoxNDcXkf6B4cdLLY+c774n9G1wwT7fbP3gA8wtSsS9/AAAAAElFTkSuQmCC", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAADm0lEQVR4nIVUW2hcVRTd+z6nJvNKk5jpxKZYbaSV1kf9CViSimClibSYQhFrP5SCRQShXwaS/PhTf/xoMMWfVqGQoKLQYFAyU6W2BZNGOzMt04QmSBxybyczk8zzzj1ny5mXMc8Dl3vuumvWXnvtOwdhm0VEiIgk9jP/GMd27Kg7a9tWXc7Knm3ftSsu8Or77RYSkSQE/5qf987G4ldmY3FKFYnC8wsfV4rJa38kbeJKEIU1HgwGZRX0r9taGs5YlmUvLppJXZOuVah8W1vCUeUuzSfJK/ZzRuKl6IJ5zcwyiszFzNDiYr3gVbmbOCwTRB4/3/mzLzB1/97MTOThxNSD36fvz/r2+ZtOJxPxYa/XvVPOs+cquUnrcqpuAoGAYpom1fufudTU/OS55eUUMNsG3eEARVGgkMufP3p4/9AjI3Usn828xyT7w+d3716qxCN0mChSqjA8PKx2dXXZ9f49B11uz7m4aRatQoFzxiibybD0ygpTVPXSxB+Rm2/3XfhF15Qhiasdt6NRFyIKIbs66VqbV8fHm30N/i81VXsrl8sQANYmSCS4xFxur5zL5X4tFq0vbv/0/Y/vvP9RC4PiB62tLRRbeDz5rL/xuiTExm5NHmxtaptWVfVEJpPG1WKlqoiAKMmpZILLEh5p2Nn47avHe3/79JOJmEzoUQD6GWdzpUGI7AoOz7jb03A0mVgqIqIKWywi4kBkN/t8WmwhduFQ+94fHieSXS+2t10eGRmRFXA6PWTBKyvLKQ6AylZiFbcSIMoiV1mRep9qdn8OAA8r0THJtKwMAvyt6ToCUFFMS+RVvq+9yjgRtzVNl4EgLGqEQiGtOhTlVEdHbvzO3T5FUb+rdzo1zglQEtqlBldbKz2KjoVYNpuOI7DPxMAGBsCu0fr7+6XBwUE+dnPyNYfjifOM2y6wbZsBqOUuxIdAqCJZNoCiqrpo+1Fyybx48vUj0dWHR20J0f8BF6fr1oW3AbbRXw9rooGAcqCzk65cv+fK2HIEiEdaV1hPz7uH8l+Nht2WhmGB7ZML3ae7X7aCAHwQcd3hUHMWMTvpFCJLW9IBvdHXwgmNb868kBFYQYH9Vexyz+HsEABtJAarBY2mslsOdBwQCBS8Wn23FjMG/utsU8FgJ7DeEGkS4JuFJYNjnu6KSN4Yi+pVTCHHlODeGCh9RlsLliYVGWUgw0leLHTfCI8aQATO9LRdxSZ6njYq5E2P/H8B+13nOEu0WC4AAAAASUVORK5CYII=", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAADiUlEQVR4nJVUXWgcVRQ+59752dlNwsbaRPvigy+6qRR8sVVrt+iDFiVS3AXFPojFtg/xNwW10nGE4lNIsbT4V9Tgg2xEUwX/QLctpSL4sLaaKiL+UFPUJGvcn+zcmXuPnEmz2da0xAPzc+6c+53vfOfcAbiElUolSUS46Pu+b3X6/89oaePo++XsyEjJW/p0eVDr4oVCoSTHEfWelw7fb1nu0OzZX69DB+t7D459Ol+f8xFxyvfLVhBsjpcDxE7H90kEAZpn9r820tWdfTJWCqI4AoEITsqDKGydi5utW/btfuRnv1y2gs3/Be3QqGwNDPxF3/ze2Oh4blmpMCZjEBEFEQEQxK7n2VrHlShSwy8+vv3zRa2LxaJeliHbs/sPj6UzXduajXqMiBdIYoiM47hCSAE6UjvP9KVfH+8AY+PsDIqPjY5m9x4cG7Uce7A132Rq8uJkAlHEKtSq1SIU8uXcjDq958AbQ4zh+75IGHITcrnvUPde83FXtveO2lwVVmJERJZtYzrTDbXqbLDviYef59FKSn7uwFt3pzzvw2ajphDQXk6KS4BqKSQQQCTRuTYYemAqoak1rUcUrAX7Kx5elkWTRttx3diotYksyU3CTwAkwXCylRuXjSCMjhVYSL8lWCxmt5N+b75R+yXT3WMTGU1Ahripl7uIDGP2ZHstHUfvBo8+9H2hVJIJw6d3FOciZbZGUfil43rSdT3B4+G6i1eq490VDj89T1i2TY363DuWpp1MrFQomEQvZo6IXC6+cOjNGyXIdD0KrYUhtEBQGCmU3Cyw2DexdjIZUjqeCXZtm1yUlKHaevD4LCwLzpAwb9tJav8c2nvPx/gL89duZPtlU5msY3nQ+YlvdztXXj2sps/u2lSpHvlqQPbOW1ecRjCTPeKfwQfVVPOQzA07fVc91ZqZ2nF88IaJwjiI8SImJ6bNJJ8HA4hkDN1lVLg6jsWP/EdpOKuuT/Wt6Tco/vjg3ltrfG4Nmjs5xoD4gffkCkulLshEhAGiuenIqX4h3A3h39OVE4V1p5KMxmwB5AjzNvs3T5xZI6TYoKrTlRP3rZs8rz93PLGEIVPmZwrkbe6qfldI+zP215dOegC4JZz909hSV1giSfFGjkEhk5j8UbjgzCdASf1EGJH4RFWnbxdGv8rr7uowAglbTRTe88XXE+eACDRaH3GM5divcMyxo9Bmx/6/TLCzCEpVbfAAAAAASUVORK5CYII=", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAADr0lEQVR4nI2UXWhcVRDHZ84592uzyUoaiD758aCYFw0RI3Gzu6Wh8aFQlO6KUj8g6FuVGPCr4rooxZdGI60SQin4eLdWUkFCH5pUBa2maSpJY6oGFUxsyLZJdrO5e/fcO3JuNpuaD8zA4XzcOX9mfmfuAGxj6XSabXdu2zaH/zGxnVgmk/Hj8bhIPP3SEwjYDOQvSrd0PpVKTRMRIiLtSjBdEXv7o9MP64bWLzTtUUAEBAAfoHy07/QxRHwvadu8aXKSlC9sMuW7ZkRoZ7Ps94Vy3YrnXjatmntXCssSEQEIABF5OHIHFvP5nvePvNC7FsCwyGQSHsBGxFVW6WxWS6VSXsFZ7QrV1CoxlyETCCgQURARFJYWJRf8+LsnP/+6+/hAfSazVyqx25nj7am+2fvpfZoeOsO5eMh1S4CAWx6HiPxQuJaVnNUxLsSJW3PzX/ZluhfX2aLikU2lvLc+PnXYNMwTnicjUsrg607giXxP0wyuGwaUy+51WSylPujpuqq0FCA8+snAPYwZk4wxy3Vdn+HWyLaIAvhEvqwJ1+nFfP7K3SHZOjs767EAKIknTStklV23vBuxCivGkOnFQt7TTbP5zxJrVtgqlzGs4ChouxHbIo4IiCKk1oEgIQ5JWQ6OiUgCkbd5EJDP0FcJ+bR+5lNZ0w3ullZvCF+MqdJjCuSxV178seQ4vTXhOm5aIaGbFjesUDB0q7I2LJZ3LPLIYqZlceVjhcMaY0wFcCTz6nPLqo7/Uzbv9J06xA3zWV/KiCdlkAxDCnw4kzz24FT7Qs6cG599YEo3mCrRv0qO89mH3V2X1jU2cd7ZvMmWk/R3a57ma+/fZTMhVN2kwx6N7B8Yqlcntp3U1Xzzp8efp5sdlPsh+vriRLKeRltCTfaN8IH+cw07RhAfpqBRxAYnevZ/l5vrODv+lKr++bFE3PstRs61qFO+3r5cmIhfoFEIRc9ee63z29w/7YOTB9VjJG0KWls11ERCNRQAkP4Bv+TcyTlNK4Yml4cIaAQIdE/STCHPn8FHoCjAPeiVnEYi+lUVR1NS1Xo12zXwrYM/Nya+mnZiZ65eUfvR0Zc1NS9dbjvsTEVXly7t26P2nV9cvCt+bsNPZbIuFUSYzK7NJvCYsafRQMbPq/3MTL+/OPFYvdCwxy16nZHWCzl12RENUbNhwy8xAtVOHnDLplAVKpYHfxlitxb2CV37Q/03iOitjLftJaI36lq+/2Z4OC4QwGsjVvVT9y+OVHABwL8ZItw/x9DZcwAAAABJRU5ErkJggg==", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAADXUlEQVR4nJVU3WsUVxQ/596ZTHbWbHa7TlMNIhI/wBihbB6U0FZBiq1pg6ALpfguSB8U33f9A6QPpaBtn8SnjVghVaMlTlETv2K0lY3xM35g0mxQk826s7szc0+5N2bd1Y2NBwbmcO79ze/3O+cMwDyRIuJEhHO5bdtaZf5BQRUXR19SeGDgSaBWrVawd5ilUhwR6fTlv787d2Nk4P699MO8PnOnbzD964mzF5fKmmQ7HyC+xYwhojjVP3QwEo3uKxYKUCoWgTEOZjAIjvNqPJeb6ej6YsOobZO2eTN68wLKA5ObgBouD35mmo224zgeCYFzKojACy4K6p7r3SwWnf1fd8T6ZhURj8fRr8FQvhL0XrpxpCHUuCubnfYQsEqaEELUBwKMcw5uqbD7xejIb/F43K/yUJpMAPi7PRTuu57+sa7O6HqVmxEIyN8xnDFWKhZ8J58nxvRDi1e23eq98s8PEiORSCglKJtgWRYW68Ono1bTlueTGUn0LXerg4jkQ4ZhYCgcgczE+IFtHbFkwrY1da33ys3OUENjz/TUVAkAdERc0LwRka9pGggSLmpey5ex2Nic4RsY4z4gyC4veHgRkbuui4GAaXguW6dsUQWiByQ3Q5AUu+CQshnnQo2Wxp8oQGkm10PHs9mpR+HIR7qUQSSh//+RkIutjzXXdY9tbV8/ItcVE0TsAKI40X/100Yz9DMAbGSMKePfo1X1zPM8H4i63RLtuXSmeyqZTM7upWy7XCl59K+hB+0Gc42c42o+eqrOkClvfeGrmTM5lIS2qA408e+mtjW3qwZ5LiTTcrJ3oPwzqBkH39QTCVKzXCZf4bCi+P3JW+Exl8mvDq9eFun8pb05/3Byeg0XaC1vCl3c9edw9GlOpBFgOMgLnT3fxBwFMqvwzd9mZ7caGXpcYq2GtbQJkWUk2L3x560h0+i3rIYL5Ba+6nk03Wx+sqzJJ5j449v2fFxivAaTUd7VjDXLlgF1AgLpCEdVbugR0zSiSiPiEsusX4eMEWh4RN1LVu9UOZE+xNOgZ+6mB1HX1jKhN9tdLRPy02MvszsAcPnhZ49/su/CNabrrUxozee6WiakVZUMq9B3plI8Y6xdQb6/6vz29b2VB193jn3eNtwC5K08v6NGHQD+A66HuuIibLRKAAAAAElFTkSuQmCC", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAD5klEQVR4nJVUX2gcRRj/Znb3Lrt3ubtctMkloAX1waLRpom9NE1ramlRQatQjWhFfKkPPggpKKKcoQ8+acEq9hCFpD7o1dY/iOQQPFqqpcS02gcVrQ+5atJ4yd3u7e3e3u3OfDKbO7k2CdgfzM7w7Te/+f78ZgDWASIQMRc/3L5z8d3B7qbdnBx5Eqf3YGlyx+amz0/jfaH8W0lVrOl6hHBiP8VcSpYoHG6Pa2eLk8O3iN1ehGbB8V6yHesKIYDCfsdA/MdoXHlZbJPX4sogSoQQJtZ6Zs8+5N4pirwbAfKqjdscmXs9HZEH/05vOUk5OQCAAZm4H6RSQMnqVJEQQjCFSJ83IHprjJSEfen40xEV819rmjwCZGWbW2O/Wg5/xp6zf+udmLUxvUVpIUSCCCDIvj3/82uSrDyFiF0SpX84Vvno3pGtn1pTO6cUmYzVXcY9hvVYNKAZhjsbnaNJMnHaEyz/EeZyOblQKGC49/b3bt7QdbBcNoB5HgTb2oBSCjXHeWH34F1pe3J4O8rKtKZKobJR87SgJFUcPiATuDMckjf5TUmn08ro6KgX7t3YF4nGDi4XCm69VuOcMbQti4kRCASPfTdz6fvHh87OaIsXdwBjU7JMmRyUCJEoReBjIJFXSbNmU9nshkS891hACTxarVoieamlruLLItEOqVatnHGUzqMP3dPzWfmjbSNUkt8PqYHh+VLJ7ekKSn7K35yb7WsLhqYpJQnbspDS1c0S4JxzVVWpFgqBaZTOpQf77n/n+AEl8ezHVtOHitpRoEdUVU1Ubdtdj8x3ppQ6jsOLS0v1js6bhp6b+X28u3AyZn+yK6dnknEhdArt7TFEGDTLBgcga+qyFYQQSiiVLMtilNUeBuisIsfbiC1/IS4DLdTrFgG4EggGCQC6AMBEvVbma0dDfhyRe4oi6uVeJuN/FZfs9iRw8gp54gTzXbLnLz4WCkdPIeeNKChw7l+Ua2CaJqhtKqiaBrZdWa7UnOQjQ/1/EkIRQDQOQE6lUnTv1s2ff3Vmdnc4pL1Yd+sB5jJPkmjE9xJH+oIHFmsP7XIZXqhW7Qumbr2974H7LguViAFvpAiZmFiJyDc0UEFMFM3a3ddHt2xWD7uI9YJpZ1vkRFc1rllr0e35srPJrji/qOHApQXdHMtkMtIP+bz/LLmed68MoDDG++d0vUP8W4l9DSCiL+KrhpW0OPpYNOxDzX8l0xwtlaobK7bz+j+lSn/Dvv7TBy1pL+jm/kWjciiH6EtooVg+Ig64qldOX+97Q2hGsFAyv/QJDWs+r+txEfENETY2yE1CwzA6zWrtzYJuDfyfVP8FTo0bmu+Plx4AAAAASUVORK5CYII=", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAADj0lEQVR4nJVUW2gcVRj+z1yz3d3sJU3MdmNT8BKpWjVUkYDCpk8FQQUjiqB9UApeEKR9MhKCoC+i+NBifFMfCikiLSgGJRsr1gpNqDVNNU0wG0mmm+lmZnZ2ZnZn5swvZzMT1vQS+8Mwh3O+8/3f+b7DIbBNISIhhCAbL6yuHYzF4od83407rn2ob9euCpuP1rcrgogcI7xYKmUWlcoXi0oFDQ/xUmnl7bAZv3UTdxNVDMikBVNTU7wI8le93dmXXdf1y2VVlyXuRAgNtpXFFIV/rqRjho2X1rT++RX1hGpTnFtS1NlyOcFwEfYmCjcAzI8ffvt9uDhz+Y+FhbkrkzN/nr1weTF3b77zRV2rjGUyqQ6+Tu8LfeOu8ykaFItFQVVVTOTvPtbZdcfhatUA6vsgt7WBIAjQcOpvDO7fe/zvNeNg3bZeoZz/+gO7d6+H9jAeypo0O4yNjYmFQsFP5Pfsa0+lD1dU1XMbjSCgFG3LojXTpIIoHps8P/fLc8NHf5Ql4TgXiAPn5ufbCSGMyI+S3jzmlxMTXbls/jNJlJ52HAsByGaCiAyLtD2V4R3HOeN57qfnvv/m9EuvvtVNwXutp6cblZVr0/fkd37LMbLvfp3e19PZe0EUxWctq0ZayZpdCQFCON7QtYDnyJPZjp1fP/HU0M/vvjOp8EjSAsAIDehSMwjmXaMtPZFKZwd1bd0jhIhwi0LEABD9rlxOUlaUow/13XXqmqYXHunr/Xx8fJwXIJlMowuPmlUjACDCrchCtRwQwjNfeYEburMr9REAXAmto5zquhYB+EeSZQKAHkuL+bXx/+9HNu5EgBj4kiTzgHCJ9ZidnZWiULjnBwYcwsOwIIokkUxK8USCTyRT/I54/LrPpwFIksylMx2ybdcqBOgHLLCTJ+/3N08wMjLCjY6OBqfPTB9IxHe86XquRD3q8zzXjgDYvGEscwI0GY8NehRnAsSZqmZ+/MyBx/5qfTxajd684DXE3LrZeHCrdxXTed9DdFXTnmjZx23FRRPNtFer9b12rT4XS0gXFd18gaV2dnk5xgCe7z8sAIiUBv0lXc+wtQ3tN6joGbpqWI9bATarbNhHojXNNAua5uyp2fX31rRafzh/w5cKWkibx1Z0c6hs1I4UEZtXSFmvfsIaXNVrP23F3lZFChTNPNUkNKzVZV3PMsW3RRhuECJCwzA6TKfxoapb+//PUf8FKXUOhzjFMGsAAAAASUVORK5CYII=", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAADPklEQVR4nJVUS2sTURS+j0nTJE2aWKPiVhHFB0oVKsVHUcQXujIg4lYK4kYKboTUH6CuBEFx4bKKCqJWpY4LbVWi9UG1PiOtNmmqnUlmkpnMnZkjZ9JoHwnUA8PMPeeeb77z3XMuIXWsB4ADAK2uZVmWpq//y2BaYlqBaH//SKBWrJaxOcx6ejilFO49e3P40eBw/5fPQ99KPu1jX2ro0q0HT5ZiDNnWA6SzmDFKqXv36auzsZaWk2XTJFa5TBjjJBgKEcMoZnRdaz+4rS0tyyB1dFC7LiBumNhOIPwstSUYbJYNw7DBdWm1CgBih5pCPlvYr8tlo2tve2tfpSLgiQR1ajDETyC9A4NXw5Hmo4VC3qaEzijNdV23MRBgnHMiLLNzMj18OZFIODM0RJGBEHpTfhXtezl0vqHBf7Coay4llM8RnDFmlU3HKJWAMd/FhcvXvut9/vYEYiSTSa8SiocQj8dpuTF6ryW+eOfviRwSnaXuTAMAfMDv99NINEZy45kz+9pbu5OyLHlpvc9f74+Em2/nVdUihPgopfPqNwBwJEkiLriCSvayXa2tY1XB2xjjDqEET3nezUsp5UIIGggE/bZgazxZvADAV8DJcAGLnbdh2Yxz12stiY94gCgm90VuFArq92hsgQ/LAEDof88UGzLXD7AwvkgSQlzfvXHdMI4rTQKwM14zv9gQCEYuMMo2M86I41S6AYFM0ySObZOmpjDqVS2YOI7tEIBrwoLjA/evqd3d3ZW5xGPHkULGD1MfVgvXbuSuE8aYI2wrFmtexbkUz+UmHvukhka8NkLhCAdwxrauWfH+7x8q/VExpItvHWDJb628eppOSydLVroEoKmG2F1DR0ZmXxjoRJY/C+bKnG4oBgBkVe0I9uioom23UH0AyKj6KfSlUimfohk70ooSrVY4G9Bjl80X24ooNwCMK3pXNT6ay+/JFoqdMoA3ipnJwjnck1X1JyMAAW/aaoB6joyqHRrP613V5DG1uMmw7BvZyeKB6p6sot2ZAsx9+vUrUhOwpjYeG22gkqw5qgox9P3I51v0knl6XNHXT99bDwivfrzuKzKoxWOGECKraldSANin9ZMJIX8AYdUvDKHzFtMAAAAASUVORK5CYII=", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAACoUlEQVR4nKVUS2gTURS9981MO03aabW1uCp+6MaFm4oSqin+wIULqaRuBEv3unMpSVVcuRMKWdhacZWCC0HElZ+4ULQrQbAgaG2NTX+ZmaQxM5N35E1rsdKGtB4Y3pv7m3veufOIagAArz3G1MKC9cdWK0fUchKRxszI2cXbbUbT0zpzNgcATa25ZffUUtmTPoAfS86Nv311A4BQ1L4VCgcXimXX8STm7FIQAPjplC7UKiq2qqmomkQUjZr9xWIxU5Xyq090WkqaWYuRtFPkbfdOruBO1hMrajmVuooatIYosbDCPaBvuyAyCQ0gNR6SiCXb03PCL71j5qqyKR+Sye2rDSLGk/OR4lhsxk0fvhbaPvQYdXUICjui2XRPpPQofnM23dfBytziepKNKsxdl/GiT+cjk35uJNbpjB3vXT0W2jDo6y+hI5Vk2vfSKumYVJ+qBuWjrVfeL9qj8W5BZLYMvf64Mt7bBUPPBp78bkX29lHiEJiH1xVfP2BmAjKfBA+8KuRGYjGr1biqijmj8X7T5It+IK3SePyZrOKtaOApK+JfosSEpNQWHW6G5dHeobZow30VBQliUyO34N2zBrPheW4GDulmEhrtybMzXT1gtZvddt7LE+Rik6l90TWmX54kwURSgiIdJhUXvYEKl5+3t++2aN4vU1dg03wneGCiGlJWG7U6D07ESRcpIfA4YNxtMPizXQqkYBYqAKCAfCkgq2gUxjHSccuVlax18s31DR26D+Nnm6P6Ocf2DaFzk5QyYOYKg1r+VTGcC4kSiDWhU7MMULGihuOuBFPWYDYddgii/UQ4w0weJJhAAiBBTAHC35qxOglgVtcjs6ayEFCgxCSJRmaO1tJjx1gVJaSVZErtsIrKSw0TD//HDbQVfgMjXFreqsXMvgAAAABJRU5ErkJggg==", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAACoElEQVR4nK1UPWhTURQ+57732jSpL9rU4GJRUQcRF0Et1RSpgoOLSiq4WDq46aTglqSOugmFDlYrTikoOPiDDkocBO0iIljooCUtTUyb5CWNebm5n9y0DdTatA1+w7vn3nu+79z7vsMl2gSSyaT3F2BvJlc02gRg6tH02rdlrvh8ea0hR2xQkAEwCH4AQR3rtaYFhRAVZgYxu8xU1jEzV5sWnM5mAwB2ENBGxBYAv+M4wS0LYuU/KWP3QsmdNAxzEAr7CxU1U5B8fjnHaCS8BiuEmYXCzSKAEoC53OIzXWzrYvGwgUikTpzLZN6kS9Xpqfl5v/YE8biByIaGrkXN4btHfE78Qib9NjJUW/saaaEGEHXycjskR456i09CQ8mR3k7t6oR9wkVhLu/58aIPn69ZfDjmzg53B/MPT/YsFaVVbVSf1DaiEaY97+yiiQldqipLx/xXP2VSY30HTcvydFx59WVxrKcLlpmQrpq2vbt6KXwIzDG1omPWlZmA+DfB/e+zs8Pd3bbfuq7F8qOhix5LXqpI1y6OhV6qKj6KFp60vZXLFB5XFF3nhP/CwmjP4HZfywOdBQVij0FO1r1vDyRurMfh2nXjYYN2pjj/s7rPDngO5FJuiqAybR5jyjSYfruKBBMpBfJ2eqiQcfvLXHodCHTYlK6UqEvmKB0E949Xa1fWgR7zj06FyBRRIfBUMu61WPw9V5RKMAudAJCkihJQVbQK6ziZuOOocsI+/eHWqhM6j0Nn233muXyuYgmT25RSkpnLDNr2t4u1vlAogtgQJrUribLts/LOopy0BxIjtROCaC8RzjCTCwUmkABIEJME6feAsdQJ0M+D/hqaBUlSm0kKrczsa+RH01gypXatCFO0SRXNi8aIY1Tvx/+GP7nqVZkjoi6XAAAAAElFTkSuQmCC"];
+
+/* ---- Wsymb2 -> svenska (SMHI:s egen skala 1-27) ---- */
+const SYMB = {
+  1:"Klart", 2:"Mest klart", 3:"Växlande molnighet", 4:"Halvklart", 5:"Molnigt",
+  6:"Mulet", 7:"Dimma", 8:"Lätta regnskurar", 9:"Regnskurar", 10:"Kraftiga regnskurar",
+  11:"Åskväder", 12:"Lätt snöblandat regn", 13:"Snöblandat regn", 14:"Kraftigt snöblandat regn",
+  15:"Lätta snöbyar", 16:"Snöbyar", 17:"Kraftiga snöbyar", 18:"Lätt regn", 19:"Regn",
+  20:"Kraftigt regn", 21:"Åska", 22:"Lätt snöblandat regn", 23:"Snöblandat regn",
+  24:"Kraftigt snöblandat regn", 25:"Lätt snöfall", 26:"Snöfall", 27:"Kraftigt snöfall"
+};
+const COMPASS = ["N","NO","O","SO","S","SV","V","NV"];
+const PAL = {
+  ground:"#0A0F13", panel:"#151F27", hairline:"#22303A", ink:"#E8F0F4",
+  muted:"#7B919E", warm:"#F2A03D", cool:"#3FAFD4", night:"#080D11",
+  live:"#54C98A", freeze:"#7FD8E8"
+};
+const PAL_NOTE = {
+  ground:"Bakgrund", panel:"Diagramfält", hairline:"Linjer", ink:"Text",
+  muted:"Etiketter", warm:"Temperatur", cool:"Nederbörd", night:"Natt",
+  live:"Färsk data", freeze:"Nollgradigt"
+};
+
+/* ---- Soluppgång / solnedgång (NOAA, verifierad mot 64,75° N) ---- */
+const RAD = Math.PI / 180;
+function sunTimes(dayMs, lat, lon){
+  const jd = dayMs/86400000 + 2440587.5;
+  const n  = Math.round(jd - 2451545.0 + 0.0008);
+  const Js = n - lon/360;
+  const M  = (357.5291 + 0.98560028*Js) % 360;
+  const C  = 1.9148*Math.sin(M*RAD) + 0.02*Math.sin(2*M*RAD) + 0.0003*Math.sin(3*M*RAD);
+  const L  = (M + C + 180 + 102.9372) % 360;
+  const Jt = 2451545.0 + Js + 0.0053*Math.sin(M*RAD) - 0.0069*Math.sin(2*L*RAD);
+  const dec = Math.asin(Math.sin(L*RAD)*Math.sin(23.4397*RAD));
+  const cosH = (Math.sin(-0.833*RAD) - Math.sin(lat*RAD)*Math.sin(dec)) /
+               (Math.cos(lat*RAD)*Math.cos(dec));
+  if (cosH >  1) return {polar:"night"};
+  if (cosH < -1) return {polar:"day"};
+  const H = Math.acos(cosH)/RAD;
+  const ms = j => (j - 2440587.5) * 86400000;
+  return { rise: ms(Jt - H/360), set: ms(Jt + H/360) };
+}
+
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, text){
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  return e;
+}
+const fmtHM = ms => new Intl.DateTimeFormat("sv-SE",
+  {hour:"2-digit", minute:"2-digit", timeZone:"Europe/Stockholm"}).format(new Date(ms));
+const hourOf = ms => Number(new Intl.DateTimeFormat("sv-SE",
+  {hour:"2-digit", hour12:false, timeZone:"Europe/Stockholm"}).format(new Date(ms)));
+
+function renderMeteo(key){
+  const set = DATA[key];
+  const rows = set.rows.map(r => ({...r, ms: Date.parse(r.t)}));
+  const svg = document.getElementById("panel");
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const {W,H,HEADER_H,RAIL_X,RAIL_W,PLOT_X,PLOT_Y,PLOT_W,PLOT_H,PRECIP_BAND} = GEOM;
+  const plotBot  = PLOT_Y + PLOT_H;
+  const tempTop  = PLOT_Y + 10;
+  const tempBot  = plotBot - PRECIP_BAND - 4;
+
+  svg.appendChild(el("rect",{x:0,y:0,width:W,height:H,fill:PAL.ground}));
+
+  /* ---------- tidsskala ---------- */
+  const t0 = rows[0].ms, t1 = rows[rows.length-1].ms;
+  const X = ms => PLOT_X + (ms - t0) / (t1 - t0) * PLOT_W;
+
+  /* ---------- diagramfält (dagsljus) ---------- */
+  svg.appendChild(el("rect",{x:PLOT_X,y:PLOT_Y,width:PLOT_W,height:PLOT_H,fill:PAL.panel}));
+
+  /* ---------- nattband (ovanpå fältet, under kurvan) ---------- */
+  const clip = el("clipPath",{id:"plotclip"});
+  clip.appendChild(el("rect",{x:PLOT_X,y:PLOT_Y,width:PLOT_W,height:PLOT_H}));
+  svg.appendChild(clip);
+  const nightG = el("g",{"clip-path":"url(#plotclip)"});
+  for (let d=-1; d<=4; d++){
+    const day = t0 + d*86400000;
+    const s = sunTimes(day, set.lat, set.lon);
+    if (s.polar === "night"){
+      nightG.appendChild(el("rect",{x:PLOT_X,y:PLOT_Y,width:PLOT_W,height:PLOT_H,fill:PAL.night}));
+      continue;
+    }
+    if (s.polar === "day") continue;
+    const next = sunTimes(day + 86400000, set.lat, set.lon);
+    const end = next.polar ? s.set + 43200000 : next.rise;
+    const x1 = Math.max(PLOT_X, X(s.set)), x2 = Math.min(PLOT_X+PLOT_W, X(end));
+    if (x2 > x1) nightG.appendChild(el("rect",
+      {x:x1, y:PLOT_Y, width:x2-x1, height:PLOT_H, fill:PAL.night}));
+  }
+  svg.appendChild(nightG);
+
+  /* ---------- diagramram ---------- */
+  svg.appendChild(el("rect",{x:PLOT_X,y:PLOT_Y,width:PLOT_W,height:PLOT_H,
+    fill:"none", stroke:PAL.hairline, "stroke-width":1}));
+
+  /* ---------- temperaturskala ---------- */
+  const temps = rows.map(r => r.T);
+  let tmin = Math.min(...temps), tmax = Math.max(...temps);
+  const pad = Math.max(1, (tmax - tmin) * 0.15);
+  tmin = Math.floor(tmin - pad); tmax = Math.ceil(tmax + pad);
+  const Y = t => tempBot - (t - tmin) / (tmax - tmin) * (tempBot - tempTop);
+
+  /* stödlinjer vid jämna gradtal */
+  const stepC = (tmax - tmin) > 14 ? 5 : ((tmax - tmin) > 7 ? 2 : 1);
+  for (let t = Math.ceil(tmin/stepC)*stepC; t <= tmax; t += stepC){
+    const y = Y(t);
+    if (y < tempTop - 1 || y > tempBot + 1) continue;
+    const zero = (t === 0);
+    svg.appendChild(el("line",{x1:PLOT_X+1, y1:y, x2:PLOT_X+PLOT_W-1, y2:y,
+      stroke: zero ? PAL.freeze : PAL.hairline,
+      "stroke-width": 1, "stroke-opacity": zero ? 0.75 : 0.5,
+      "stroke-dasharray": zero ? "none" : "1 3"}));
+    svg.appendChild(el("text",{x:PLOT_X+4, y:y-2.5, fill:zero?PAL.freeze:PAL.muted,
+      "font-size":10, "font-family":"Montserrat", "font-weight":500}, t+"°"));
+  }
+
+  /* ---------- nederbörd ---------- */
+  const pPeak = Math.max(...rows.map(r => r.p));   // what the data reaches
+  const pmax  = Math.max(0.5, pPeak);              // scale floor, so a trace shower isn't full-height
+  const bw = Math.max(2, PLOT_W / rows.length - 1.6);
+  rows.forEach(r => {
+    if (!(r.p > 0)) return;
+    const h = Math.max(1.5, r.p / pmax * (PRECIP_BAND - 6));
+    svg.appendChild(el("rect",{x:X(r.ms)-bw/2, y:plotBot-1-h, width:bw, height:h,
+      fill:PAL.cool, rx:0.5}));
+  });
+  svg.appendChild(el("line",{x1:PLOT_X+1, y1:plotBot-1, x2:PLOT_X+PLOT_W-1, y2:plotBot-1,
+    stroke:PAL.hairline, "stroke-width":1}));
+  /* bar heights mean nothing unless the scale is named */
+  const pTotal = rows.reduce((a,r) => a + (r.p > 0 ? r.p : 0), 0);
+  if (pTotal > 0){
+    svg.appendChild(el("text",{x:PLOT_X+4, y:plotBot-PRECIP_BAND+8, fill:PAL.cool,
+      "font-size":10, "font-family":"Montserrat", "font-weight":600},
+      "max " + pPeak.toFixed(1).replace(".",",") + " mm/h"));
+  } else {
+    svg.appendChild(el("text",{x:PLOT_X+4, y:plotBot-6, fill:PAL.muted,
+      "font-size":10, "font-family":"Montserrat", "font-weight":500}, "ingen nederbörd"));
+  }
+
+  /* ---------- temperaturkurva + yta ---------- */
+  const pts = rows.map(r => [X(r.ms), Y(r.T)]);
+  const d = pts.map((p,i) => (i?"L":"M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  const grad = el("linearGradient",{id:"tgrad", x1:"0", y1:"0", x2:"0", y2:"1"});
+  grad.appendChild(el("stop",{offset:"0",   "stop-color":PAL.warm, "stop-opacity":"0.30"}));
+  grad.appendChild(el("stop",{offset:"1",   "stop-color":PAL.warm, "stop-opacity":"0.02"}));
+  svg.appendChild(grad);
+  svg.appendChild(el("path",{d: d + ` L ${pts[pts.length-1][0].toFixed(1)} ${tempBot} L ${pts[0][0].toFixed(1)} ${tempBot} Z`,
+    fill:"url(#tgrad)", stroke:"none"}));
+  svg.appendChild(el("path",{d, fill:"none", stroke:PAL.warm, "stroke-width":1.6,
+    "stroke-linejoin":"round", "stroke-linecap":"round"}));
+  svg.appendChild(el("circle",{cx:pts[0][0], cy:pts[0][1], r:2.2, fill:PAL.warm}));
+
+  /* ---------- tidsaxel ---------- */
+  rows.forEach((r,i) => {
+    const hh = hourOf(r.ms);
+    if (i !== 0 && hh % 6 !== 0) return;
+    const x = X(r.ms);
+    svg.appendChild(el("line",{x1:x, y1:plotBot, x2:x, y2:plotBot+3,
+      stroke:PAL.hairline, "stroke-width":1}));
+    svg.appendChild(el("text",{x, y:plotBot+13, fill:PAL.muted, "font-size":10,
+      "font-family":"Montserrat", "font-weight":500, "text-anchor":"middle"},
+      i === 0 ? "nu" : String(hh).padStart(2,"0")));
+  });
+
+  /* ---------- vänsterspalt ---------- */
+  const now = rows[0];
+  svg.appendChild(el("text",{x:RAIL_X, y:PLOT_Y+30, fill:PAL.ink, "font-size":32,
+    "font-family":"Montserrat", "font-weight":600,
+    "font-variant-numeric":"tabular-nums"},
+    now.T.toFixed(1).replace(".", ",") + "°"));
+
+  const cond = SYMB[now.s] || "—";
+  const words = cond.split(" ");
+  let line = "", lines = [];
+  words.forEach(w => {
+    if ((line + " " + w).trim().length > 14){ lines.push(line.trim()); line = w; }
+    else line = (line + " " + w).trim();
+  });
+  if (line) lines.push(line);
+  lines.slice(0,2).forEach((ln,i) => {
+    svg.appendChild(el("text",{x:RAIL_X, y:PLOT_Y+48+i*12, fill:PAL.muted, "font-size":12,
+      "font-family":"Montserrat", "font-weight":500}, ln));
+  });
+
+  const deg = ((now.wd % 360) + 360) % 360;
+  const stack = [
+    ["VIND",  now.ws.toFixed(1).replace(".",",") + " m/s " + COMPASS[Math.round(deg/45) % 8]],
+    ["FUKT",  now.rh + " %"],
+    ["MOLN",  (now.cc != null ? now.cc : 0) + "/8"]
+  ];
+  stack.forEach(([lab,val],i) => {
+    const y = PLOT_Y + 86 + i*34;
+    svg.appendChild(el("text",{x:RAIL_X, y, fill:PAL.muted, "font-size":10,
+      "font-family":"Montserrat", "font-weight":700, "letter-spacing":"1.1"}, lab));
+    svg.appendChild(el("text",{x:RAIL_X, y:y+14, fill:PAL.ink, "font-size":14,
+      "font-family":"Montserrat", "font-weight":500,
+      "font-variant-numeric":"tabular-nums"}, val));
+  });
+
+  /* ---------- sidhuvud ---------- */
+  svg.appendChild(el("text",{x:RAIL_X, y:17, fill:PAL.ink, "font-size":12,
+    "font-family":"Montserrat", "font-weight":700, "letter-spacing":"1.6"},
+    set.place.toUpperCase()));
+  svg.appendChild(el("text",{x:W-22, y:17, fill:PAL.ink, "font-size":12,
+    "font-family":"Montserrat", "font-weight":500, "text-anchor":"end",
+    "font-variant-numeric":"tabular-nums"}, fmtHM(set.fetched)));
+  svg.appendChild(el("circle",{cx:W-12, cy:13.5, r:2.6, fill:PAL.live}));
+  svg.appendChild(el("line",{x1:0, y1:HEADER_H, x2:W, y2:HEADER_H,
+    stroke:PAL.hairline, "stroke-width":1}));
+
+  /* ---------- text under panelen ---------- */
+  const s0 = sunTimes(t0, set.lat, set.lon);
+  document.getElementById("meta").textContent =
+    `${set.place} ${set.lat.toFixed(2)}°N ${set.lon.toFixed(2)}°O · ` +
+    `${rows.length} perioder (${Math.round((t1-t0)/3600000)} h) · ` +
+    `${(set.bytes/1024).toFixed(1)} kB JSON · ` +
+    (s0.polar ? `polär ${s0.polar}`
+              : `sol ${fmtHM(s0.rise)}–${fmtHM(s0.set)}`) +
+    ` · hämtad ${new Intl.DateTimeFormat("sv-SE",{dateStyle:"short",timeStyle:"short",
+        timeZone:"Europe/Stockholm"}).format(new Date(set.fetched))}`;
+}
+
+/* =====================================================================
+   Timtabellen. Logiken speglar SMHI_Display/detail.cpp; värdtesterna i
+   test/test_detail täcker C-versionen.
+   ===================================================================== */
+const IC_ID = {clear_d:0, clear_n:1, fair_d:2, fair_n:3, partly_d:4, partly_n:5,
+  cloudy:6, overcast:7, fog:8, shower_d:9, shower_n:10, rain:11, thunder:12, sleet:13,
+  snowshower_d:14, snowshower_n:15, snow:16, sunrise:17, sunset:18};
+
+function feelsLike(T, ws){
+  let f = T;
+  if (T <= 10 && ws >= 1){
+    const v = Math.pow(ws, 0.16);
+    f = Math.min(T, 13.12 + 0.6215*T - 13.956*v + 0.48669*T*v);
+  }
+  return Math.round(f);
+}
+
+function wsymbIcon(s, night){
+  const dn = (d, n) => IC_ID[night ? n : d];
+  if (s === 1) return dn("clear_d","clear_n");
+  if (s === 2) return dn("fair_d","fair_n");
+  if (s === 3 || s === 4) return dn("partly_d","partly_n");
+  if (s === 5) return IC_ID.cloudy;
+  if (s === 6) return IC_ID.overcast;
+  if (s === 7) return IC_ID.fog;
+  if (s >= 8 && s <= 10) return dn("shower_d","shower_n");
+  if (s === 11 || s === 21) return IC_ID.thunder;
+  if ((s >= 12 && s <= 14) || (s >= 22 && s <= 24)) return IC_ID.sleet;
+  if (s >= 15 && s <= 17) return dn("snowshower_d","snowshower_n");
+  if (s >= 18 && s <= 20) return IC_ID.rain;
+  if (s >= 25 && s <= 27) return IC_ID.snow;
+  return IC_ID.cloudy;
+}
+
+function isNight(ms, lat, lon){
+  const s = sunTimes(ms, lat, lon);
+  if (s.polar) return s.polar === "night";
+  return ms < s.rise || ms >= s.set;
+}
+
+const ymd = ms => new Intl.DateTimeFormat("sv-SE",
+  {year:"numeric", month:"2-digit", day:"2-digit", timeZone:"Europe/Stockholm"}).format(new Date(ms));
+const WD = ["Sön","Mån","Tis","Ons","Tors","Fre","Lör"];
+const WDL = ["SÖNDAG","MÅNDAG","TISDAG","ONSDAG","TORSDAG","FREDAG","LÖRDAG"];
+const MON = ["jan","feb","mar","apr","maj","jun","jul","aug","sep","okt","nov","dec"];
+function parts(ms){
+  const f = new Intl.DateTimeFormat("en-US", {weekday:"short", day:"numeric", month:"numeric",
+    timeZone:"Europe/Stockholm"}).formatToParts(new Date(ms));
+  const g = t => f.find(p => p.type === t).value;
+  const wd = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(g("weekday"));
+  return {wd, day: Number(g("day")), mon: Number(g("month")) - 1};
+}
+
+function planRows(rows, now, lat, lon){
+  let first = 0;
+  while (first + 1 < rows.length && rows[first].ms + 3600000 <= now) first++;
+  const out = [];
+  let prev = null;
+  for (let i = first; i < rows.length; i++){
+    const d = ymd(rows[i].ms);
+    if (prev !== null && d !== prev) out.push({kind:"day", t:rows[i].ms, rank:0});
+    prev = d;
+    out.push({kind:"hour", t:rows[i].ms, idx:i, rank:1});
+  }
+  const tf = rows[first].ms, tl = rows[rows.length-1].ms;
+  for (let day = tf - 86400000; day <= tl + 86400000; day += 86400000){
+    const s = sunTimes(day, lat, lon);
+    if (s.polar) continue;
+    if (s.rise > tf && s.rise < tl) out.push({kind:"rise", t:s.rise, rank:2});
+    if (s.set  > tf && s.set  < tl) out.push({kind:"set",  t:s.set,  rank:2});
+  }
+  out.sort((a, b) => a.t - b.t || a.rank - b.rank);
+  return out.slice(0, HOURS.ROWS * HOURS.PAGES);
+}
+
+function renderHours(key, pg){
+  const set = DATA[key];
+  const rows = set.rows.map(r => ({...r, ms: Date.parse(r.t)}));
+  const svg = document.getElementById("panel");
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const {W, H, HEADER_H, RAIL_X} = GEOM;
+  const Hh = HOURS;
+  const F = (size, weight, fill, extra) => Object.assign({fill, "font-size":size,
+    "font-family":"Montserrat", "font-weight":weight, "font-variant-numeric":"tabular-nums"}, extra||{});
+
+  svg.appendChild(el("rect",{x:0,y:0,width:W,height:H,fill:PAL.ground}));
+
+  const plan = planRows(rows, set.fetched, set.lat, set.lon);
+  const first = (pg - 1) * Hh.ROWS;
+  const page = plan.slice(first, first + Hh.ROWS);
+
+  /* kolumnrubriker */
+  const lab = {"letter-spacing":"1"};
+  svg.appendChild(el("text", {x:Hh.TIME_X, y:Hh.COLS_Y+9, ...F(10,700,PAL.muted,lab)}, "TID"));
+  [[Hh.TEMP_R,"TEMP"],[Hh.FEELS_R,"KÄNSLA"],[Hh.MM_R,"MM"]].forEach(([r,t]) =>
+    svg.appendChild(el("text", {x:r, y:Hh.COLS_Y+9, "text-anchor":"end", ...F(10,700,PAL.muted,lab)}, t)));
+  svg.appendChild(el("text", {x:Hh.ARROW_CX-7, y:Hh.COLS_Y+9, ...F(10,700,PAL.muted,lab)}, "M/S"));
+
+  page.forEach((r, i) => {
+    const y = Hh.ROW_Y0 + i * Hh.ROW_H;
+    const base = y + 17;
+    svg.appendChild(el("rect",{x:0, y:y-1, width:W, height:1, fill:PAL.hairline}));
+    if (r.kind === "day"){
+      const p = parts(r.t);
+      svg.appendChild(el("text", {x:Hh.TIME_X, y:y+16, ...F(12,600,PAL.muted,{"letter-spacing":"1"})},
+        `${WDL[p.wd]} ${p.day} ${MON[p.mon].toUpperCase()}`));
+      return;
+    }
+    svg.appendChild(el("text", {x:Hh.TIME_X, y:base, ...F(14,500,PAL.ink)}, fmtHM(r.t)));
+    let icon;
+    if (r.kind === "hour"){
+      const p = rows[r.idx];
+      icon = wsymbIcon(p.s, isNight(p.ms, set.lat, set.lon));
+      const T = Math.round(p.T);
+      svg.appendChild(el("text", {x:Hh.TEMP_R, y:base+1, "text-anchor":"end",
+        ...F(16,700,T <= 0 ? PAL.freeze : PAL.ink)}, T + "°"));
+      svg.appendChild(el("text", {x:Hh.FEELS_R, y:base, "text-anchor":"end",
+        ...F(14,500,PAL.ink)}, feelsLike(p.T, p.ws) + "°"));
+      const wet = p.p >= 0.05;
+      svg.appendChild(el("text", {x:Hh.MM_R, y:base, "text-anchor":"end",
+        ...F(14,500,wet ? PAL.cool : PAL.muted)}, wet ? p.p.toFixed(1).replace(".",",") : "0"));
+      /* pilen pekar dit vinden blåser */
+      const a = (p.wd + 180) * RAD, dx = Math.sin(a), dy = -Math.cos(a);
+      const cx = Hh.ARROW_CX, cy = y + Hh.ROW_H/2, L = 6.5, hd = 4;
+      const tx = cx + dx*L, ty = cy + dy*L;
+      const c = Math.cos(35*RAD), sn = Math.sin(35*RAD), bx = -dx*hd, by = -dy*hd;
+      svg.appendChild(el("polyline", {points:[
+        [cx-dx*L, cy-dy*L], [tx, ty], [tx + bx*c - by*sn, ty + bx*sn + by*c], [tx, ty],
+        [tx + bx*c + by*sn, ty - bx*sn + by*c]].map(q => q.join(",")).join(" "),
+        fill:"none", stroke:PAL.ink, "stroke-width":2, "stroke-linecap":"round",
+        "stroke-linejoin":"round"}));
+      svg.appendChild(el("text", {x:Hh.WIND_X, y:base, ...F(14,500,PAL.ink)}, String(Math.round(p.ws))));
+    } else {
+      icon = r.kind === "rise" ? IC_ID.sunrise : IC_ID.sunset;
+      svg.appendChild(el("text", {x:Hh.EVENT_X, y:base, ...F(14,500,PAL.warm)},
+        r.kind === "rise" ? "Soluppgång" : "Solnedgång"));
+    }
+    svg.appendChild(el("image", {href:ICONS[icon], x:Hh.ICON_X, y:y+(Hh.ROW_H-20)/2,
+      width:20, height:20, style:"image-rendering:pixelated"}));
+  });
+
+  /* sidhuvud, med datum för sidans första rad */
+  const dp = parts(page.length ? page[0].t : set.fetched);
+  svg.appendChild(el("text",{x:RAIL_X, y:17, fill:PAL.ink, "font-size":12,
+    "font-family":"Montserrat", "font-weight":700, "letter-spacing":"1.6"},
+    set.place.toUpperCase()));
+  svg.appendChild(el("text",{x:W/2, y:17, "text-anchor":"middle", ...F(12,600,PAL.ink)},
+    `${WD[dp.wd]} ${dp.day} ${MON[dp.mon]}`));
+  svg.appendChild(el("text",{x:W-22, y:17, fill:PAL.ink, "font-size":12,
+    "font-family":"Montserrat", "font-weight":500, "text-anchor":"end",
+    "font-variant-numeric":"tabular-nums"}, fmtHM(set.fetched)));
+  svg.appendChild(el("circle",{cx:W-12, cy:13.5, r:2.6, fill:PAL.live}));
+  svg.appendChild(el("line",{x1:0, y1:HEADER_H, x2:W, y2:HEADER_H,
+    stroke:PAL.hairline, "stroke-width":1}));
+
+  document.getElementById("meta").textContent =
+    `Sida ${pg} av ${HOURS.PAGES} · rad ${first+1}–${first+page.length} av ${plan.length} · ` +
+    `känsla = vindavkylning när T ≤ 10 °C och vind ≥ 1 m/s · ingen byvind i datan`;
+}
+
+let page = 0;
+function render(key){ if (page === 0) renderMeteo(key); else renderHours(key, page); }
+
+/* ---------- specifikationsrutor ---------- */
+const sw = document.getElementById("swatches");
+Object.keys(PAL).forEach(k => {
+  const row = document.createElement("div");
+  row.className = "sw";
+  const i = document.createElement("i"); i.style.background = PAL[k];
+  const b = document.createElement("b"); b.textContent = PAL_NOTE[k];
+  const c = document.createElement("code"); c.textContent = PAL[k];
+  row.append(i,b,c); sw.appendChild(row);
+});
+const gd = document.getElementById("geom");
+[["Panel", GEOM.W+" × "+GEOM.H+" px"],
+ ["Sidhuvud", GEOM.HEADER_H+" px"],
+ ["Vänsterspalt", "x "+GEOM.RAIL_X+" · bredd "+GEOM.RAIL_W],
+ ["Diagram", "x "+GEOM.PLOT_X+" y "+GEOM.PLOT_Y],
+ ["Diagramyta", GEOM.PLOT_W+" × "+GEOM.PLOT_H],
+ ["Nederbördsband", GEOM.PRECIP_BAND+" px"]].forEach(([k,v]) => {
+  const dt = document.createElement("dt"); dt.textContent = k;
+  const dd = document.createElement("dd"); dd.textContent = v;
+  gd.append(dt,dd);
+});
+
+/* ---------- kontroller ---------- */
+let current = "dry";
+document.getElementById("scale").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-scale]"); if (!btn) return;
+  const s = Number(btn.dataset.scale);
+  const svg = document.getElementById("panel");
+  svg.setAttribute("width", GEOM.W*s); svg.setAttribute("height", GEOM.H*s);
+  [...e.currentTarget.querySelectorAll("button")].forEach(b =>
+    b.setAttribute("aria-pressed", String(b === btn)));
+});
+document.getElementById("dataset").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-set]"); if (!btn) return;
+  current = btn.dataset.set; render(current);
+  [...e.currentTarget.querySelectorAll("button")].forEach(b =>
+    b.setAttribute("aria-pressed", String(b === btn)));
+});
+
+document.getElementById("pages").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-page]"); if (!btn) return;
+  page = Number(btn.dataset.page); render(current);
+  [...e.currentTarget.querySelectorAll("button")].forEach(b =>
+    b.setAttribute("aria-pressed", String(b === btn)));
+});
+
+render(current);
+</script>
+</body>
+</html>
