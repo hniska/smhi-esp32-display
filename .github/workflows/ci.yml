@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Host tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Run host tests
+        run: uvx --from platformio pio test -e native
+
+  build:
+    name: Firmware (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [fnk0103_2p8_st7789, fnk0103_2p8_ili9341]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            .pio/libdeps
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+      - name: Use the example configuration
+        run: cp SMHI_Display/config.example.h SMHI_Display/config.h
+      - name: Build firmware
+        run: uvx --from platformio pio run -e ${{ matrix.env }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.env }}
+          path: .pio/build/${{ matrix.env }}/firmware.bin
+          if-no-files-found: error

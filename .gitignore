@@ -1,5 +1,9 @@
 .fontwork/
 .pio/
 
-# innehåller wifi-lösenord — kopiera config.example.h till config.h
+# Contains the Wi-Fi password. Copy config.example.h to config.h.
 SMHI_Display/config.h
+
+# Local screenshots from tools/screenshot.py
+/skarm.png
+.DS_Store
